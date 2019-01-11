@@ -9,14 +9,11 @@ class IR_Receiver {
 		
 	public:
 		virtual void	begin(uint16_t *bufer, const uint16_t bufsize, const uint8_t timeoutMS);
-		
-		
-		
 		virtual void	end();
 			
 		void			setOnReceivedCallback( void (*func)(void) );
 		
-		bool			isStoped() 		{ return (isr_params.rcvstate == kStopState); }
+		virtual bool			isStoped();
 
 	protected:
 		uint8_t		_pin;   	// pin for IR data from detector
