@@ -142,9 +142,9 @@ void IRreceiver_ESP8266::resumeIsrParams() {
 	isr_params.received_lengh 	= 0;
 	
 	uint16_t len = isr_params.bufsize;			//using local var to reduce size 
-	for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0; )	//clear buffer	
+	for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0 );	//clear buffer	
 }
-
+/*
 bool IRreceiver_ESP8266::getRaw() {
 	
 	if ( isr_params.rcvstate != StopState ) return false;
@@ -152,10 +152,11 @@ bool IRreceiver_ESP8266::getRaw() {
 		
 		if ( isr_params.received_lengh == isr_params.bufsize) return false; //
 		uint16_t len = isr_params.received_lengh;			//using local var to reduce size 
-		for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0; )	//clear buffer
+		for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0 );	//clear buffer
 		
 	}
 	return false;
 	
 		
 }
+*/
