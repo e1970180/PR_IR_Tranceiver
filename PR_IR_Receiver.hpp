@@ -13,7 +13,7 @@ class IR_Receiver {
 			
 		void			setOnReceivedCallback( void (*func)(void) );
 		
-		virtual bool			isStoped();
+		virtual bool	isStoped();
 
 	protected:
 		uint8_t		_pin;   	// pin for IR data from detector
