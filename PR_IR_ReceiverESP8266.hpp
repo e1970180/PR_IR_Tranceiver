@@ -10,57 +10,57 @@
 #include <stdint.h>
 
 
+
 extern "C" {
 	#include <gpio.h>
 	#include <user_interface.h>
 }
 
-// receiver states
-typedef enum ReceiveState: uint8_t {
-	StopState 		= 0,
-	IdleState 		= 1,
-	ReceivingState 	= 2,
-} ReceiveState_t;
+
 
 // information for the interrupt handler
 typedef struct {
-	uint8_t 	timeoutMS;  	// Nr. of milliSeconds before we give up.
-	uint8_t 	rcvstate;  		// state machine
-	uint16_t 	bufsize;  		// max. nr. of entries in the capture buffer.
-	uint16_t 	received_lengh; // 	
-	uint16_t 	*rawbuf;  		// raw data
+	uint8_t 			timeoutMS;  	// Nr. of milliSeconds before we give up.
+	IR_ReceiverState_t 	rcvstate;  		// state machine //TODO check if IR_ReceiverState_t increase IRAM
+	uint16_t 			bufsize;  		// max. nr. of entries in the capture buffer.
+	uint16_t 			received_lengh; // 	
+	uint16_t 			*rawbuf;  		// raw data
 								// uint16_t is used for rawlen as it saves 3 bytes of iram in the interrupt handler. Don't ask why, I don't know. It just does.
 } ISRparams_t;
-
 
 //******************** Globals
 
 static ETSTimer 		timer;
+volatile ISRparams_t	isrParams;
+uint16_t				rawData[IR_BUFFER_SIZE];
 
-volatile ISRparams_t	isr_params;
+void isrParams_resume();
 
 
 class IRreceiver_ESP8266 : public IR_Receiver {
 	public:
-		explicit IRreceiver_ESP8266(const uint16_t recvpin);
+		explicit IRreceiver_ESP8266(const uint16_t recvpin, const uint8_t timeoutMS);
 
-		virtual void		begin(uint16_t *bufer, const uint16_t bufsize, const uint8_t timeoutMS);
+		virtual void		begin();
 		virtual void		end();
 
+		virtual IR_ReceiverState_t	getState() 	{ return isrParams.rcvstate; }
 		
-		bool				isStoped() 		{ return (isr_params.rcvstate == StopState); }
-		
-		
-		//void				resumeIsrParams();
+		bool 				getReceived(std::vector <uint16_t>& output);
+	
 	private:
-		void				resumeIsrParams();
+
 };
 
 static void ICACHE_RAM_ATTR read_timeout(void *arg __attribute__((unused))) {
 	os_intr_lock();
 
-	if ( isr_params.received_lengh ) isr_params.rcvstate = StopState;	
+	//if nothing was received yet  or if rcvstate == IR_R_OVERLENGH just continue
+	//if something already got (mean received_lengh >0 ) then  rcvstate = IR_R_RECEIVED
+	//if ( isrParams.received_lengh && (isrParams.rcvstate != IR_R_OVERLENGH ) ) isrParams.rcvstate = IR_R_RECEIVED;	
 
+	if ( isrParams.rcvstate == IR_R_RECEIVING ) isrParams.rcvstate = IR_R_RECEIVED;	
+	
 	os_intr_unlock();
 }
 
@@ -74,56 +74,58 @@ static void ICACHE_RAM_ATTR gpio_intr() {
 
 	static uint32_t start = 0;
 
-	// Grab a local copy of received to reduce instructions used in IRAM.
-	// This is an ugly premature optimisation code-wise, but we do everything we can to save IRAM.
-	// It seems referencing the value via the structure uses more instructions.
-	// Less instructions means faster and less IRAM used.
-	// N.B. It saves about 13 bytes of IRAM.
+	uint16_t received = isrParams.received_lengh; // Grab a local copy of received to reduce instructions used in IRAM.  It saves about 13 bytes of IRAM.
 	
-	uint16_t received = isr_params.received_lengh;
+	switch (isrParams.rcvstate) {
+		case IR_R_WAIT:
+			isrParams.rcvstate = IR_R_RECEIVING;
+		break;
+		case IR_R_RECEIVING: {
 
-	if (received >= isr_params.bufsize) isr_params.rcvstate = StopState;
+			uint32_t t = now - start;	
+			if (now < start) t += UINT32_MAX;
+			isrParams.rawbuf[received] = t;
 
-	if (isr_params.rcvstate == StopState) return;
-
-	if (isr_params.rcvstate == IdleState) {
-		isr_params.rcvstate = ReceivingState;
-	} 
-	else {
-		uint32_t t = now - start;
-		if (now < start) t += UINT32_MAX;
-		isr_params.rawbuf[received] = t;
-			
 		//if (now < start)
-		//	isr_params.rawbuf[received] = (UINT32_MAX - start + now);
+		//	isrParams.rawbuf[received] = (UINT32_MAX - start + now);
 		//else
-		//	isr_params.rawbuf[received] = (now - start);
+		//	isrParams.rawbuf[received] = (now - start);
 
-		isr_params.received_lengh + 1; //it use less IRAM than isr_params.received_lengh++;
+			received++;
+			isrParams.received_lengh = received;
+			
+			if (received >= isrParams.bufsize) isrParams.rcvstate = IR_R_OVERLENGH;			
+		break;
+		}
+		default:		 //IR_R_OVERLENGH, IR_R_RECEIVED, IR_R_STOP
+			return;	
+		break;	
 	}
 	start = now;
-#define ONCE 0
-	os_timer_arm(&timer, isr_params.timeoutMS, ONCE);
+	#define ONCE 0
+	os_timer_arm(&timer, isrParams.timeoutMS, ONCE);
 }
 
-IRreceiver_ESP8266::IRreceiver_ESP8266(const uint16_t recvpin) : IR_Receiver(recvpin) {}
 
+IRreceiver_ESP8266::IRreceiver_ESP8266(const uint16_t recvpin, const uint8_t timeoutMS) : IR_Receiver(recvpin, timeoutMS) {
+	
+	isrParams.bufsize = IR_BUFFER_SIZE;	  
+	isrParams.rawbuf  = rawData;
+	
+	//isrParams.timeoutMS = std::min(timeoutMS, (uint8_t)(UINT16_MAX/1000) );	// [ms] uint8_t could store only (UINT16_MAX/1000) microSec 
+	isrParams.timeoutMS = timeoutMS;
+	isrParams.rcvstate = IR_R_STOP;
+}
 
 
 //   bufsize: Nr. of entries to have in the capture buffer.
 //   timeoutMS: Nr. of milli-Seconds of no signal before we stop capturing data.  
-void IRreceiver_ESP8266::begin(uint16_t *bufer, const uint16_t bufsize, const uint8_t timeoutMS) {
+void IRreceiver_ESP8266::begin() {
 
 	//pinMode(_pin, INPUT); //TODO: does it necessary???
-	
-	isr_params.bufsize = bufsize;	  
-	isr_params.rawbuf = bufer;
-	
-	isr_params.timeoutMS = std::min(timeoutMS, (uint8_t)(UINT16_MAX/1000) );	// [ms] uint8_t could store only (UINT16_MAX/1000) microSec 
-	
-	resumeIsrParams();  // initialize state machine variables
 
-	// Initialize timer
+	isrParams_resume();  // initialize state machine variables
+
 	os_timer_disarm(&timer);
 	os_timer_setfn(&timer, reinterpret_cast<os_timer_func_t *>(read_timeout), NULL);
 
@@ -134,29 +136,29 @@ void IRreceiver_ESP8266::end() {
 
 	os_timer_disarm(&timer);
 	detachInterrupt(_pin);
+	isrParams.rcvstate = IR_R_STOP; 
 }
 
-void IRreceiver_ESP8266::resumeIsrParams() {
+void isrParams_resume() {
+
+	isrParams.rcvstate 			= IR_R_WAIT;
+	isrParams.received_lengh 	= 0;
 	
-	isr_params.rcvstate 		= IdleState;
-	isr_params.received_lengh 	= 0;
+	uint16_t len = isrParams.bufsize;			//using local var to reduce size 
+	for (uint16_t i = 0; i < len ; isrParams.rawbuf[i++] = 0 );	//clear buffer	
 	
-	uint16_t len = isr_params.bufsize;			//using local var to reduce size 
-	for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0 );	//clear buffer	
+//	for (uint16_t i = 0; i < len ; i++ ) {	//clear buffer	
+//		isrParams.rawbuf[i] = 0;		
+//	}
 }
-/*
-bool IRreceiver_ESP8266::getRaw() {
+
+bool IRreceiver_ESP8266::getReceived(std::vector <uint16_t>& output) {
 	
-	if ( isr_params.rcvstate != StopState ) return false;
+	if ( isrParams.rcvstate != IR_R_RECEIVED ) return false; 
 	else {
-		
-		if ( isr_params.received_lengh == isr_params.bufsize) return false; //
-		uint16_t len = isr_params.received_lengh;			//using local var to reduce size 
-		for (uint16_t i = 0; i <= len ; isr_params.rawbuf[i++] = 0 );	//clear buffer
-		
+		output.clear();
+		uint16_t len = isrParams.received_lengh;			//using local var to reduce size 
+		for (uint16_t i = 0; i < len ; output.push_back(isrParams.rawbuf[i++]) );
 	}
-	return false;
-	
-		
+	return true;	
 }
-*/
