@@ -46,7 +46,7 @@ class IRreceiver_ESP8266 : public IR_Receiver {
 
 		virtual IR_ReceiverState_t	getState() 	{ return isrParams.rcvstate; }
 		
-		bool 				getReceived(std::vector <uint16_t>& output);
+		bool 	getReceived(std::vector <uint16_t>& output);
 	
 	private:
 
