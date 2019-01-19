@@ -26,13 +26,14 @@ class IRSender {
 									const uint16_t oneMarkLength, const uint16_t zeroMarkLength, 
 									const uint16_t oneSpaceLength, const uint16_t zeroSpaceLength);
 		
-		void 			sendIRraw(uint16_t raw[], const uint16_t lenght);
-		void 			sendIRraw(const std::vector <uint16_t>& vectorRaw);
+		void 			sendRaw(uint16_t raw[], const uint16_t lenght);
+		void 			sendRaw(const std::vector <uint16_t>& vectorRaw);
 		
-		uint8_t 		bitReverse(const uint8_t x);
+		//uint8_t 		bitReverse(const uint8_t x);
 		
 		virtual void	begin();
 		virtual void	end();
+		
 		virtual void 	setFrequency(const uint16_t frequency);
 		virtual void 	space(const uint16_t spaceLength);
 		virtual void 	mark(const uint16_t markLength);
@@ -107,7 +108,7 @@ void	IRSender::sendIRnbits(const uint64_t data, const uint16_t nbits, const bool
 	
 
 
-void	IRSender::sendIRraw(uint16_t raw[], const uint16_t lenght) 
+void	IRSender::sendRaw(uint16_t raw[], const uint16_t lenght) 
 {
 	for (uint16_t i = 0; i < lenght; i++)
 	{
@@ -116,7 +117,7 @@ void	IRSender::sendIRraw(uint16_t raw[], const uint16_t lenght)
 	space(0);
 }
 
-void 	IRSender::sendIRraw(const std::vector <uint16_t>& vectorRaw) 
+void 	IRSender::sendRaw(const std::vector <uint16_t>& vectorRaw) 
 {
 	uint16_t	lenght = vectorRaw.size();
 	
@@ -125,7 +126,7 @@ void 	IRSender::sendIRraw(const std::vector <uint16_t>& vectorRaw)
 		if ( i & 0x01 ) mark( vectorRaw.at(i) ); else space( vectorRaw.at(i) );
 	}
 	space(0);
-
+	
 }
 
 

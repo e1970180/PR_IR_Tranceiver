@@ -1,55 +1,47 @@
 #pragma once
 /*
-    Tion breather control 
+    Ballu heatpump control 
 
  */
 
 
 #include "PR_IR_Sender.hpp"
-#include "IR_protocols\PR_IR_protocol_NEC_timings.h" 	//Tion protocol is NEC
+#include "PR_IR_protocol_Ballu.h" 	
 #include "utils\PR_IR_Transiver_Utils.hpp"
 
-typedef enum TionCommand: uint8_t {
-	CMD_TION_REPEAT = 1,
-	CMD_TION_POWER= 2,
-	CMD_TION_SET= 3,
-	CMD_TION_UP= 4,
-	CMD_TION_DOWN= 5,
-	CMD_TION_UNKNOWN= 6
-} TionCommand_t;
 
-const uint16_t TionPower = 	0b0000000000100000;
-const uint16_t TionSet = 	0b0000000000101000;
-const uint16_t TionUp = 	0b0000000000110000;
-const uint16_t TionDown = 	0b0000000000000000;
-const uint8_t TionRepeat = 1;
 
 const float tolPerc = 0.15;	//
 
 bool _decodeByte(const std::vector <uint16_t>& vectorRaw, const uint16_t startPos, const bool isMSBfirst, uint8_t& decodedByte);
 
-class IR_Device_TionBreather 
+class IR_Protocol_Ballu 
 {
 	public:
-		//IR_Device_TionBreather();
+		//IR_Protocol_Ballu();
 		
 		void	setSender(IRSender& IRsender);
 		//void	send(IRSender& IR, uint8_t powerModeCmd, uint8_t operatingModeCmd, uint8_t fanSpeedCmd, uint8_t temperatureCmd);
 			
-		bool	sendCommand(const TionCommand_t& tionCmd);
+		//bool	sendCommand(const TionCommand_t& tionCmd);
 		bool	decode(const std::vector <uint16_t>& vectorRaw, TionCommand_t& tionCmd);
+		bool	code(std::vector <uint16_t>& vectorRaw, );
 	
 	private:
-		void sendTion(IRSender& IR, const TionCommand_t tionCmd);
+		//void sendTion(IRSender& IR, const TionCommand_t tionCmd);
 	
-		IRSender* _irSender = nullptr;
+		//IRSender* _irSender = nullptr;
+		
+		uint8_t		_crc(const std::array<uint8_t, BalluCmdLenght-3>, const uint16_t begin,  const uint16_t begin);
+		
+		std::array <uint8_t, BalluCmdLenght-3> 	_data;
 };
 
-//IR_Device_TionBreather::IR_Device_TionBreather() {}
+//IR_Protocol_Ballu::IR_Protocol_Ballu() {}
 
-void	IR_Device_TionBreather::setSender(IRSender& IRsender) { _irSender = &IRsender; }
+void	IR_Protocol_Ballu::setSender(IRSender& IRsender) { _irSender = &IRsender; }
 
-bool	IR_Device_TionBreather::sendCommand(const TionCommand_t& tionCmd)
+bool	IR_Protocol_Ballu::sendCommand(const TionCommand_t& tionCmd)
 {
 	if ( _irSender == nullptr ) return false;
 	
@@ -95,7 +87,7 @@ bool	IR_Device_TionBreather::sendCommand(const TionCommand_t& tionCmd)
 	_irSender->end();
 }
 
-bool	IR_Device_TionBreather::decode(const std::vector <uint16_t>& vectorRaw, TionCommand_t& tionCmd)
+bool	IR_Protocol_Ballu::decode(const std::vector <uint16_t>& vectorRaw, TionCommand_t& tionCmd)
 {
 	vectorRaw.cbegin();
 	uint16_t rawLen = vectorRaw.size();
@@ -116,28 +108,28 @@ bool	IR_Device_TionBreather::decode(const std::vector <uint16_t>& vectorRaw, Tio
 	switch (_tmpCmd) {
 		case CMD_TION_REPEAT:
 		
-			if ( !isMatch(vectorRaw.at(0), NecRptHdrMark,  tolPerc) ) return false;
-			if ( !isMatch(vectorRaw.at(1), NecRptHdrSpace, tolPerc) ) return false;
+			if ( !isMatch(vectorRaw.at(0), NecRptHdrMarkTicks*NecTick, tolPerc) ) return false;
+			if ( !isMatch(vectorRaw.at(1), NecRptHdrSpaceTicks*NecTick, tolPerc) ) return false;
 			
-			if ( !isMatch(vectorRaw.at(2), NecOneMark, tolPerc) ) return false;
+			if ( !isMatch(vectorRaw.at(2), NecOneMarkTicks*NecTick, tolPerc) ) return false;
 			
 			tionCmd = _tmpCmd;
 
 			break;
 		case CMD_TION_UNKNOWN:
 		
-			if ( !isMatch(vectorRaw.at(0), NecCmdHdrMark,  tolPerc) ) return false;
-			if ( !isMatch(vectorRaw.at(1), NecCmdHdrSpace, tolPerc) ) return false;
+			if ( !isMatch(vectorRaw.at(0), NecCmdHdrMarkTicks*NecTick, tolPerc) ) return false;
+			if ( !isMatch(vectorRaw.at(1), NecCmdHdrSpaceTicks*NecTick, tolPerc) ) return false;
  
 			uint8_t addressLow = 0;
 			uint8_t addressHigh = 0;
 			uint8_t command = 0;
 			uint8_t commandInv = 0;
 
-			if (!_decodeByte(vectorRaw, 2,    NecMSBfirst, addressLow)) return false;
+			if (!_decodeByte(vectorRaw, 2, NecMSBfirst, addressLow)) return false;
 			if (!_decodeByte(vectorRaw, 2+16, NecMSBfirst, addressHigh)) return false;
 
-			if (!_decodeByte(vectorRaw, 2+16+16,    NecMSBfirst, command)) return false;		
+			if (!_decodeByte(vectorRaw, 2+16+16, NecMSBfirst, command)) return false;		
 			if (!_decodeByte(vectorRaw, 2+16+16+16, NecMSBfirst, commandInv)) return false;					
 
 			if ( command != (uint8_t)(~commandInv) ) return false;
@@ -174,13 +166,13 @@ bool _decodeByte(const std::vector <uint16_t>& vectorRaw, const uint16_t startPo
 
 	for (uint16_t i = startPos ; i < (startPos + 16); i += 2 ) {
 		
-		if ( isMatch(vectorRaw.at(i), NecOneMark, tolPerc) &&
-			 isMatch(vectorRaw.at(i+1), NecOneSpace, tolPerc) )
+		if ( isMatch(vectorRaw.at(i), NecOneMarkTicks*NecTick, tolPerc) &&
+			 isMatch(vectorRaw.at(i+1), NecOneSpaceTicks*NecTick, tolPerc) )
 			
 			data = (data << 1) | 1;	//"1"
 			
-		else if ( isMatch(vectorRaw.at(i), NecZeroMark, tolPerc) &&
-				  isMatch(vectorRaw.at(i+1), NecZeroSpace, tolPerc) )
+		else if ( isMatch(vectorRaw.at(i), NecZeroMarkTicks*NecTick, tolPerc) &&
+				  isMatch(vectorRaw.at(i+1), NecZeroSpaceTicks*NecTick, tolPerc) )
 				  
 				data = (data << 1);	//"0"
 			

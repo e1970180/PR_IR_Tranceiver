@@ -16,7 +16,6 @@
 
 const uint16_t NecTick = 560;		//[uS]
 //COMMAND
-
 const uint16_t NecCmdLenght			= 67;						
 //header
 const uint16_t NecCmdHdrMarkTicks	= 16;
@@ -36,10 +35,21 @@ const uint16_t NecRptHdrSpaceTicks	= 4;
 
 const bool	   NecMSBfirst 			= false;
 
-const uint16_t NecCommandLength = 193;
-const uint16_t NecRptLength = 3;
 
+//COMMAND
+//header
+const uint16_t NecCmdHdrMark	= NecTick * NecCmdHdrMarkTicks;
+const uint16_t NecCmdHdrSpace	= NecTick * NecCmdHdrSpaceTicks;
+//mark
+const uint16_t NecOneMark 		= NecTick * NecOneMarkTicks;
+const uint16_t NecZeroMark 		= NecTick * NecZeroMarkTicks;
+//space
+const uint16_t NecOneSpace 		= NecTick * NecOneSpaceTicks;
+const uint16_t NecZeroSpace 	= NecTick * NecZeroSpaceTicks;
 
-
+//REPEAT
+//header
+const uint16_t NecRptHdrMark	= NecTick * NecRptHdrMarkTicks;
+const uint16_t NecRptHdrSpace	= NecTick * NecRptHdrSpaceTicks;
 	 
 
